@@ -1,0 +1,29 @@
+# Crypto Trading Assistant Project Rules
+
+This file contains project-specific rules and intelligence for the Crypto Trading Assistant.
+
+## Code Structure
+
+- Keep individual code files under 200 lines; break larger files into smaller, modular components.
+
+## Command Execution
+
+- Use semicolons (`;`) for command chaining in PowerShell.
+
+## API Key Management
+
+- API keys and sensitive configuration should be stored in a `.env` file in the `config/` directory.
+
+## Error Handling
+
+- Implement robust error handling for API calls and trade execution, including retry logic where appropriate.
+
+## Logging
+
+- Use the configured Winston logger for all application logging.
+
+## Development Workflow
+
+- Plan extensively before executing tool calls.
+- Reflect on the outcomes of previous tool calls to inform subsequent steps.
+- Do not rely solely on tool calls; incorporate analytical thinking and planning.
