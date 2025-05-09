@@ -246,22 +246,41 @@ async function executeTrade(recommendation, buyingPower, marketIndicators) {
                     logger.error(`Invalid buying power: ${buyingPower}. Cannot execute BUY order.`);
                     return;
                 }
-                const notionalAmount = buyingPower * 0.45; // Use 45% of buying power for testing
-                logger.info(`Calculated Notional Amount for BUY: ${notionalAmount}`);
-                if (notionalAmount > 1) { // Alpaca might have minimum notional value (e.g. $1)
-                    logger.info(`Attempting to create BUY order with symbol: ${symbol}, notional: ${notionalAmount}`);
+
+                // Check if a position already exists
+                try {
+                    const existingPosition = await alpaca.getPosition(symbol);
+                    if (existingPosition && parseFloat(existingPosition.qty) > 0) {
+                        logger.info(`Already have a position in ${symbol} (Qty: ${existingPosition.qty}). Not placing another BUY order.`);
+                        return; // Exit if position already exists
+                    }
+                } catch (error) {
+                    if (error.statusCode !== 404) { // 404 means no position, which is fine for a BUY
+                        logger.error(`Error checking existing position for ${symbol} before BUY: ${error.message}`);
+                        throw error; // Re-throw to be caught by outer retry logic if it's not a 404
+                    }
+                    // If 404, it means no position, so proceed to buy
+                    logger.info(`No existing position for ${symbol}, proceeding with BUY logic.`);
+                }
+                
+                // Use a fixed small notional amount for testing, e.g., $100
+                const fixedNotionalAmount = 100; 
+                logger.info(`Calculated Notional Amount for BUY (fixed for testing): ${fixedNotionalAmount}`);
+
+                if (buyingPower >= fixedNotionalAmount && fixedNotionalAmount > 1) {
+                    logger.info(`Attempting to create BUY order with symbol: ${symbol}, notional: ${fixedNotionalAmount}`);
                     await alpaca.createOrder({
-                        symbol: symbol, 
-                        notional: notionalAmount,
+                        symbol: symbol,
+                        notional: fixedNotionalAmount,
                         side: 'buy',
                         type: 'market',
-                        time_in_force: 'gtc', // Specify time_in_force for crypto
+                        time_in_force: 'gtc', 
                     });
-                    logger.info(`Executed BUY order for ${notionalAmount} USD of ${symbol}.`);
+                    logger.info(`Executed BUY order for ${fixedNotionalAmount} USD of ${symbol}.`);
                     return; // Success
                 } else {
-                    logger.info('Not enough buying power (or notional < $1) to execute BUY order.');
-                    return; // Not an error, but can't trade
+                    logger.info(`Not enough buying power for fixed notional amount ($${fixedNotionalAmount}) or amount is too small.`);
+                    return; 
                 }
             } else if (recommendation === 'SELL') {
                 logger.info('SELL recommendation received. Checking for existing position...');
