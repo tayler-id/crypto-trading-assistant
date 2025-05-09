@@ -58,7 +58,10 @@ async function fetchAccountBalance() {
     try {
         // Implement fetching logic using Alpaca API
         const account = await alpaca.getAccount();
-        logger.info('Account balance fetched. Equity:', account.equity, 'Buying Power:', account.buying_power);
+        // Ensure buying_power and equity are numbers
+        account.equity = parseFloat(account.equity);
+        account.buying_power = parseFloat(account.buying_power);
+        logger.info(`Account balance fetched. Equity: ${account.equity}, Buying Power: ${account.buying_power}`);
         return account;
     } catch (error) {
         logger.error('Error fetching account balance:', error);
@@ -87,7 +90,7 @@ async function getMarketData(coinId = 'bitcoin', vsCurrency = 'usd', days = '60'
         if (!currentPrice) {
             logger.warn(`Current price for ${coinId} not found.`);
         }
-        logger.info(`Market data fetched. ${coinId} Price (${vsCurrency.toUpperCase()}):`, currentPrice);
+        logger.info(`Market data fetched. ${coinId} Price (${vsCurrency.toUpperCase()}): ${currentPrice}`);
 
         // Construct marketIndicators object
         const marketIndicators = {
@@ -174,7 +177,7 @@ Recommendation:`;
             logger.warn(`Could not extract a clear BUY/SELL/HOLD from AI response: "${recommendationText}". Defaulting to HOLD.`);
         }
         
-        logger.info('Extracted AI Recommendation:', finalRecommendation);
+        logger.info(`Extracted AI Recommendation: ${finalRecommendation}`);
         return finalRecommendation;
     } catch (error) {
         logger.error('Error getting AI recommendation:', error.message);
@@ -200,7 +203,7 @@ Recommendation:`;
                     } else {
                         logger.warn(`Could not extract a clear BUY/SELL/HOLD from AI response (Retry): "${recommendationText}". Defaulting to HOLD.`);
                     }
-                    logger.info('AI Recommendation successful on retry:', finalRecommendation);
+                    logger.info(`AI Recommendation successful on retry: ${finalRecommendation}`);
                     return finalRecommendation;
                 } catch (retryError) {
                     logger.error(`Retry attempt ${i + 1} for AI recommendation failed:`, retryError.message);
@@ -212,88 +215,101 @@ Recommendation:`;
             }
         }
         // For other errors, or if retries for 503 also fail and we didn't return HOLD above.
-        logger.error('Failed to get AI recommendation after all attempts or due to non-retryable error. Defaulting to HOLD.');
+        logger.error('Failed to get AI recommendation after all attempts or due to non-retryable error. Defaulting to HOLD for this cycle.');
         return 'HOLD'; // Default to HOLD if initial call or retries fail for other reasons
     }
 }
 
 // Function to execute trades via Alpaca API
 async function executeTrade(recommendation, buyingPower, marketIndicators) {
-    logger.info('Executing trade:', recommendation);
-    try {
-        // Implement trade execution logic using Alpaca API
-        const symbol = 'BTC/USD'; // Trading pair for Bitcoin on Alpaca
+    logger.info(`Executing trade based on recommendation: ${recommendation}`);
+    const symbol = 'BTC/USD'; // Trading pair for Bitcoin on Alpaca
+    const maxRetries = 3;
+    const retryDelayMs = 5000; // 5 seconds
 
-        if (recommendation === 'BUY') {
-            // Calculate quantity to buy based on buyingPower and current price
-            const bitcoinPrice = marketIndicators.currentPrice; // Corrected property name
-            if (!bitcoinPrice) {
-                logger.error('Cannot execute BUY order: Bitcoin price not available.');
-                return; // Exit if price is not available
+    let attempt = 0;
+    while (attempt <= maxRetries) {
+        try {
+            if (attempt > 0) {
+                logger.info(`Retrying trade execution (Attempt ${attempt}/${maxRetries})...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs)); // Wait before retrying
             }
-            // Buy with a portion of buying power, e.g., 90% to leave some buffer
-            const notionalAmount = buyingPower * 0.9;
-            if (notionalAmount > 0) {
-                 await alpaca.createOrder({
-                    symbol: symbol,
-                    notional: notionalAmount, // Use notional for fractional shares/easy amount
-                    side: 'buy',
-                    type: 'market',
-                });
-                logger.info(`Executed BUY order for ${notionalAmount} USD of ${symbol}.`);
+
+            if (recommendation === 'BUY') {
+                const bitcoinPrice = marketIndicators.currentPrice;
+                if (!bitcoinPrice) {
+                    logger.error('Cannot execute BUY order: Bitcoin price not available.');
+                    return; 
+                }
+                logger.info(`Attempting BUY order. Buying Power: ${buyingPower}, Bitcoin Price: ${bitcoinPrice}`);
+                if (typeof buyingPower !== 'number' || isNaN(buyingPower) || buyingPower <= 0) {
+                    logger.error(`Invalid buying power: ${buyingPower}. Cannot execute BUY order.`);
+                    return;
+                }
+                const notionalAmount = buyingPower * 0.9; // Use 90% of buying power
+                logger.info(`Calculated Notional Amount for BUY: ${notionalAmount}`);
+                if (notionalAmount > 1) { // Alpaca might have minimum notional value (e.g. $1)
+                    logger.info(`Attempting to create BUY order with symbol: ${symbol}, notional: ${notionalAmount}`);
+                    await alpaca.createOrder({
+                        symbol: symbol, 
+                        notional: notionalAmount,
+                        side: 'buy',
+                        type: 'market',
+                        time_in_force: 'gtc', // Specify time_in_force for crypto
+                    });
+                    logger.info(`Executed BUY order for ${notionalAmount} USD of ${symbol}.`);
+                    return; // Success
+                } else {
+                    logger.info('Not enough buying power (or notional < $1) to execute BUY order.');
+                    return; // Not an error, but can't trade
+                }
+            } else if (recommendation === 'SELL') {
+                logger.info('SELL recommendation received. Checking for existing position...');
+                try {
+                    const position = await alpaca.getPosition(symbol);
+                    if (position && parseFloat(position.qty) > 0) {
+                        logger.info(`Existing position found for ${symbol}: Qty ${position.qty}. Closing position.`);
+                        await alpaca.closePosition(symbol);
+                        logger.info(`Executed SELL order to close entire ${symbol} position.`);
+                    } else {
+                        logger.info(`No existing position found for ${symbol} to sell.`);
+                    }
+                    return; // Success or no action needed
+                } catch (error) {
+                    if (error.statusCode === 404) {
+                        logger.info(`No existing position found for ${symbol} to sell (404).`);
+                        return; // No position to sell, not an error for retry
+                    }
+                    throw error; // Re-throw other errors to be caught by the outer catch for retry
+                }
+            } else if (recommendation === 'HOLD') {
+                logger.info('Holding position as recommended.');
+                return; // Success (no action)
             } else {
-                logger.info('Not enough buying power to execute BUY order.');
+                logger.warn(`Unknown recommendation: ${recommendation}. No action taken.`);
+                return; // Unknown recommendation, not an error for retry
             }
-        } else if (recommendation === 'SELL') {
-            logger.info('SELL recommendation received. Checking for existing position...');
-            try {
-                const position = await alpaca.getPosition(symbol);
-                // If position exists and has a quantity greater than 0
-                if (position && parseFloat(position.qty) > 0) {
-                    logger.info(`Existing position found for ${symbol}: Qty ${position.qty}. Closing position.`);
-                    // Close the entire position
-                    await alpaca.closePosition(symbol);
-                    logger.info(`Executed SELL order to close entire ${symbol} position.`);
-                } else {
-                    logger.info(`No existing position found for ${symbol} to sell.`);
-                }
-            } catch (error) {
-                // Handle case where getPosition throws error (e.g., 404 if no position exists)
-                if (error.statusCode === 404) {
-                     logger.info(`No existing position found for ${symbol} to sell.`);
-                } else {
-                    // Re-throw other errors
-                    throw error;
-                }
+        } catch (error) {
+            logger.error(`Error executing trade (Attempt ${attempt}):`, error.message);
+            if (attempt === maxRetries) {
+                logger.error('Max retries reached. Trade execution failed permanently.');
+                // Optionally, re-throw or handle as a persistent failure
+                // For now, we'll just log and let the process complete for this cycle
+                return; 
             }
-        } else if (recommendation === 'HOLD') {
-            logger.info('Holding position as recommended.');
-        } else {
-            logger.warn('Unknown recommendation:', recommendation);
-        }
-        logger.info('Trade execution logic completed.');
-    } catch (error) {
-        logger.error('Error executing trade:', error);
-        // Simple retry logic
-        const maxRetries = 3;
-        const retryDelayMs = 5000; // 5 seconds
-
-        for (let i = 0; i < maxRetries; i++) {
-            logger.info(`Retrying trade execution (Attempt ${i + 1}/${maxRetries})...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelayMs)); // Wait before retrying
-            try {
-                // Re-attempt the trade with the same parameters
-                await executeTrade(recommendation, buyingPower, marketIndicators);
-                logger.info('Trade retry successful.');
-                return; // Exit after successful retry
-            } catch (retryError) {
-                logger.error(`Retry attempt ${i + 1} failed:`, retryError);
-                if (i === maxRetries - 1) {
-                    logger.error('Max retries reached. Trade execution failed permanently.');
-                    throw retryError; // Re-throw the error after max retries
-                }
+            // Log specific Alpaca error details if available
+            if (error.response && error.response.data) {
+                 logger.error('Alpaca API error details:', error.response.data);
+            }
+             // Only retry for specific, potentially transient errors (e.g., 5xx, network issues)
+             // A 422 error (Unprocessable Entity) usually means the request itself is flawed (e.g. bad symbol, insufficient funds not caught by pre-check)
+             // and retrying the same request won't help.
+            if (error.statusCode && (error.statusCode === 422 || error.statusCode === 403 || error.statusCode === 401)) {
+                logger.error(`Non-retryable Alpaca API error ${error.statusCode}. Aborting retries for this trade.`);
+                return;
             }
         }
+        attempt++;
     }
 }
 
