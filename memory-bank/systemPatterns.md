@@ -11,7 +11,7 @@
     3.  Calculate Technical Indicators (SMA7, SMA50 from historical prices)
     4.  Generate AI Prompt (using Account Data, Market Data, and Calculated Indicators)
     5.  Get AI Recommendation (Gemini: BUY, SELL, HOLD) - includes retry logic for API errors with consistent parsing.
-    6.  Execute Trade (Alpaca: BUY with notional, SELL by closing position) - includes retry logic for API errors.
+    6.  Execute Trade (Alpaca: BUY with notional and `time_in_force: 'gtc'`, SELL by closing position) - includes non-recursive retry logic.
 - **Scheduling:** Uses `node-cron` for periodic execution (every 5 minutes).
 - **Configuration:** Environment variables loaded via `dotenv` from `config/.env`.
 - **Logging:** Uses `winston` to log to console and files (`logs/`).
@@ -19,12 +19,13 @@
 ## 2. Key Technical Decisions
 
 - **Brokerage API:** Alpaca (`@alpacahq/alpaca-trade-api`) chosen for its API accessibility for stocks and crypto.
-- **Market Data API:** CoinGecko (via `axios`) chosen for its free tier and comprehensive data endpoints (`/simple/price`, `/coins/{id}/market_chart`, `/coins/{id}/ohlc`).
-- **AI Decision Engine:** Google Gemini (`@google/generative-ai`) chosen for its generative AI capabilities. Using `gemini-1.5-flash-latest` model.
-- **Technical Indicators:** Simple Moving Averages (SMA7, SMA50) calculated locally from historical price data.
-- **Scheduling:** `node-cron` selected for its simplicity in scheduling tasks within a Node.js application.
-- **Logging:** `winston` chosen as a flexible logging library for Node.js.
-- **Environment Management:** `dotenv` used for managing API keys and configuration settings securely.
+- **Market Data API:** CoinGecko (via `axios`) chosen for its free tier and comprehensive data endpoints.
+- **AI Decision Engine:** Google Gemini (`@google/generative-ai`) using `gemini-1.5-flash-latest` model.
+- **Technical Indicators:** Simple Moving Averages (SMA7, SMA50) calculated locally.
+- **Scheduling:** `node-cron`.
+- **Logging:** `winston`.
+- **Environment Management:** `dotenv`.
+- **Order Parameters:** Explicitly set `time_in_force: 'gtc'` for crypto orders on Alpaca.
 
 ## 3. Component Relationships
 
@@ -61,9 +62,13 @@ graph TD
 
 ## 4. Error Handling Patterns
 
-- **API Calls:** Wrapped in `try...catch` blocks. Errors are logged using Winston, including response data and status for HTTP errors.
-- **Trade Execution (`executeTrade`):** Includes a basic retry mechanism (3 attempts with 5-second delay) upon failure. `getPosition` 404 errors are handled gracefully.
+- **API Calls:** Wrapped in `try...catch` blocks. Errors logged, including response data/status for HTTP errors.
+- **Trade Execution (`executeTrade`):**
+    - Uses a `while` loop for retries (max 3 attempts, 5s delay), not recursive.
+    - Checks for valid `buyingPower` before BUY.
+    - `getPosition` 404 errors handled gracefully for SELL.
+    - Aborts retries for non-transient Alpaca errors (422, 403, 401).
 - **AI Recommendation (`getTradingRecommendation`):**
-    - Includes retry logic for Gemini API calls (specifically for 503 errors), with a 10-second delay between retries.
-    - Defaults to 'HOLD' if retries fail or other errors occur.
-    - Uses `/\b(BUY|SELL|HOLD)\b/i` regex for parsing the recommendation, both in the initial attempt and within the retry logic, ensuring consistency.
+    - Includes retry logic for Gemini API calls (specifically for 503 errors), with a 10-second delay.
+    - Defaults to 'HOLD' and logs if retries fail or other errors occur.
+    - Uses `/\b(BUY|SELL|HOLD)\b/i` regex for parsing, consistently in initial and retry attempts.
