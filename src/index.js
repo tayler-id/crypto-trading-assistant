@@ -193,9 +193,10 @@ Recommendation:`;
                     logger.info('Raw AI Recommendation Text (Retry):', recommendationText);
 
                     let finalRecommendation = 'HOLD';
-                    const match = recommendationText.match(/^(BUY|SELL|HOLD)/);
+                    // Look for BUY, SELL, or HOLD as whole words, case-insensitive, take the first match
+                    const match = recommendationText.match(/\b(BUY|SELL|HOLD)\b/i); 
                     if (match && match[0]) {
-                        finalRecommendation = match[0];
+                        finalRecommendation = match[0].toUpperCase(); // Ensure it's uppercase
                     } else {
                         logger.warn(`Could not extract a clear BUY/SELL/HOLD from AI response (Retry): "${recommendationText}". Defaulting to HOLD.`);
                     }
