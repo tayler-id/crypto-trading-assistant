@@ -164,11 +164,12 @@ Recommendation:`;
         let recommendationText = response.text().trim().toUpperCase();
         logger.info('Raw AI Recommendation Text:', recommendationText);
 
-        // Extract only BUY, SELL, or HOLD from the beginning of the string
+        // Extract BUY, SELL, or HOLD from the AI's response text
         let finalRecommendation = 'HOLD'; // Default to HOLD
-        const match = recommendationText.match(/^(BUY|SELL|HOLD)/);
+        // Look for BUY, SELL, or HOLD as whole words, case-insensitive, take the first match
+        const match = recommendationText.match(/\b(BUY|SELL|HOLD)\b/i); 
         if (match && match[0]) {
-            finalRecommendation = match[0];
+            finalRecommendation = match[0].toUpperCase(); // Ensure it's uppercase
         } else {
             logger.warn(`Could not extract a clear BUY/SELL/HOLD from AI response: "${recommendationText}". Defaulting to HOLD.`);
         }
