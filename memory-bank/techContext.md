@@ -13,9 +13,12 @@
     - `dotenv`: For loading environment variables from a `.env` file.
 - **External APIs:**
     - Alpaca API (Trading & Account Management)
-    - CoinGecko API (Market Data - specifically `/simple/price`)
-    - Google Gemini API (AI Analysis - specifically `gemini-1.5-flash-latest` model)
+    - CoinGecko API (Market Data - `/simple/price`, `/coins/{id}/market_chart`, `/coins/{id}/ohlc`)
+    - Google Gemini API (AI Analysis - `gemini-1.5-flash-latest` model)
 - **Version Control:** Git, GitHub
+- **Technical Indicators Calculated:**
+    - Simple Moving Average (SMA7)
+    - Simple Moving Average (SMA50)
 
 ## 2. Development Setup
 
@@ -35,7 +38,8 @@
 
 - **API Rate Limits:** All external APIs (Alpaca, CoinGecko, Gemini) have rate limits. The application logic should be mindful of these, especially with the 5-minute execution schedule. More robust error handling might be needed to handle rate limit errors specifically (e.g., backoff strategies).
 - **API Key Security:** API keys stored in `.env` are ignored by Git, but care must be taken not to expose this file or commit keys accidentally. Environment variables are recommended for production deployment.
-- **Market Data Latency:** Market data from CoinGecko might have some delay. Real-time data might require different APIs or paid plans.
-- **AI Response Variability:** Gemini API responses might vary. The current implementation expects a simple 'BUY'/'SELL'/'HOLD' string. More robust parsing or prompt engineering might be needed.
+- **Market Data Latency & Accuracy:** Market data from CoinGecko might have some delay. The accuracy and availability of specific data points (like OHLC for certain intervals) can vary. Real-time, high-frequency data might require different APIs or paid plans.
+- **Indicator Calculation:** SMAs are calculated based on daily historical closing prices from CoinGecko. The accuracy depends on the quality and granularity of this data.
+- **AI Response Variability:** Gemini API responses might vary. The current implementation expects a response starting with 'BUY'/'SELL'/'HOLD'. More robust parsing or prompt engineering might be needed.
 - **Trading Risks:** Automated trading involves significant financial risk. The current logic is basic and does not include sophisticated risk management, position sizing, or stop-loss mechanisms. **This script is for educational/demonstration purposes and should not be used for live trading without significant enhancements and thorough testing.**
 - **Node.js Single-Threaded Nature:** While async operations handle I/O well, computationally intensive tasks (if added later) could block the event loop.
