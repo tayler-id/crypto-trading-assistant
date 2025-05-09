@@ -11,7 +11,7 @@
     3.  Calculate Technical Indicators (SMA7, SMA50 from historical prices)
     4.  Generate AI Prompt (using Account Data, Market Data, and Calculated Indicators)
     5.  Get AI Recommendation (Gemini: BUY, SELL, HOLD) - includes retry logic for API errors with consistent parsing.
-    6.  Execute Trade (Alpaca: BUY with notional and `time_in_force: 'gtc'`, SELL by closing position) - includes non-recursive retry logic.
+    6.  Execute Trade (Alpaca: BUY with fixed notional $100 after checking no existing position, SELL by closing position) - includes non-recursive retry logic.
 - **Scheduling:** Uses `node-cron` for periodic execution (every 5 minutes).
 - **Configuration:** Environment variables loaded via `dotenv` from `config/.env`.
 - **Logging:** Uses `winston` to log to console and files (`logs/`).
@@ -25,7 +25,10 @@
 - **Scheduling:** `node-cron`.
 - **Logging:** `winston`. Corrected logging for numeric values.
 - **Environment Management:** `dotenv`.
-- **Order Parameters:** Explicitly set `time_in_force: 'gtc'` for crypto orders on Alpaca. Notional amount for BUY orders adjusted to 45% of buying power for testing.
+- **Order Parameters:**
+    - Explicitly set `time_in_force: 'gtc'` for crypto orders on Alpaca.
+    - BUY orders use a fixed notional amount of $100 for testing.
+    - BUY orders check for existing positions before execution.
 
 ## 3. Component Relationships
 
@@ -66,8 +69,9 @@ graph TD
 - **Trade Execution (`executeTrade`):**
     - Uses a `while` loop for retries (max 3 attempts, 5s delay), not recursive.
     - Checks for valid `buyingPower` before BUY.
-    - `getPosition` 404 errors handled gracefully for SELL.
-    - **Corrected retry condition to use `error.response.status` for checking non-retryable Alpaca API errors (403, 422, 401).**
+    - Checks for existing position before BUY.
+    - `getPosition` 404 errors handled gracefully for BUY and SELL.
+    - Corrected retry condition to use `error.response.status` for checking non-retryable Alpaca API errors (403, 422, 401).
 - **AI Recommendation (`getTradingRecommendation`):**
     - Includes retry logic for Gemini API calls (specifically for 503 errors), with a 10-second delay.
     - Defaults to 'HOLD' and logs if retries fail or other errors occur.

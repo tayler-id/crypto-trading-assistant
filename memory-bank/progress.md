@@ -16,15 +16,16 @@
     - `getTradingRecommendation` function uses an enhanced prompt for Google Gemini.
     - Parses the AI response to extract BUY, SELL, or HOLD using `/\b(BUY|SELL|HOLD)\b/i`.
     - Includes retry logic for Gemini API calls (specifically for 503 errors), defaulting to 'HOLD' and logging correctly if retries fail. The regex within the retry block is consistent.
-- **Trade Execution (Enhanced & Corrected):**
+- **Trade Execution (Enhanced & Safer):**
     - `executeTrade` function:
-        - Includes logic to place a market BUY order via Alpaca API using notional value.
+        - Includes logic to place a market BUY order via Alpaca API.
+        - **Checks for existing position before BUY; if position exists, logs and skips BUY.**
+        - **Uses a fixed notional amount of $100 for BUY orders during testing (instead of a percentage of buying power).**
         - Added `time_in_force: 'gtc'` to `alpaca.createOrder` for crypto orders.
         - Correctly uses `marketIndicators.currentPrice`.
         - Implemented SELL logic: checks for existing Bitcoin position and closes it. Handles 404 errors if no position exists.
         - Retry logic refactored to a `while` loop.
-        - **Adjusted notional amount for BUY orders to 45% of buying power for testing.**
-        - **Corrected retry condition to use `error.response.status` for checking non-retryable Alpaca API errors (403, 422, 401).**
+        - Corrected retry condition to use `error.response.status` for checking non-retryable Alpaca API errors (403, 422, 401).
         - Added checks for valid `buyingPower` and logs `notionalAmount`.
         - Added more detailed logging for trade attempts and Alpaca API error details.
 - **Error Handling (Improved):** `try...catch` blocks for API calls. Retry mechanisms for `executeTrade` (non-recursive) and `getTradingRecommendation`. Specific handling for non-transient Alpaca errors in `executeTrade`.
@@ -37,25 +38,24 @@
 
 - **Technical Indicators:** Integrate more indicators (RSI, MACD, Bollinger Bands).
 - **AI Prompt Refinement:** Continue refining the Gemini prompt.
-- **Risk Management:** Implement robust risk management.
+- **Risk Management:** Implement robust risk management (e.g., stop-loss orders, take-profit orders, maximum drawdown limits, position sizing rules beyond simple percentage). The fixed $100 BUY is for testing only.
 - **Error Handling:** Further enhance for more specific API errors.
 - **Testing:** Thorough paper trading, unit/integration tests, backtesting.
-- **Configuration:** More parameters via `.env` (e.g., trade size percentage for production, risk parameters, SMA periods, retry counts/delays).
+- **Configuration:** More parameters via `.env` (e.g., trade size percentage/amount for production, risk parameters, SMA periods, retry counts/delays).
 - **Code Modularity:** Refactor `src/index.js`.
 - **Security:** Review API key handling for production.
 
 ## 3. Current Status
 
-- Major bug fixes implemented (recursive retry, `time_in_force`, data parsing, logging, notional amount adjustment for testing, trade retry conditions).
-- Bot is significantly more robust and functional.
+- Major bug fixes and safety improvements implemented.
+- Bot is significantly more robust and functional for testing.
 - Memory Bank is up-to-date.
 - Project is ready for another round of testing by the user.
 
 ## 4. Known Issues
 
 - SELL logic only closes the entire position.
-- Risk management is still very basic.
+- Risk management is still very basic (fixed $100 BUY for testing).
 - The bot currently only trades Bitcoin (BTC/USD).
 - AI recommendation parsing might still need refinement if Gemini API responses vary significantly.
-- The `notionalAmount` for BUY orders is currently set to 45% of buying power for testing; this should be reviewed/made configurable for production.
 - The blank "Raw AI Recommendation Text" log when the AI *does* provide a valid recommendation needs investigation (though parsing now works).

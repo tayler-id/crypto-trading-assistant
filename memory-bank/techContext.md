@@ -43,4 +43,8 @@
 - **AI Response Variability:** Gemini responses might vary. Current parsing looks for BUY/SELL/HOLD keywords.
 - **Trading Risks:** **This script is for educational/demonstration purposes and should not be used for live trading without significant enhancements and thorough testing.** No sophisticated risk management is implemented.
 - **Node.js Single-Threaded Nature:** Long-running synchronous tasks could block the event loop.
-- **Alpaca Order Parameters:** Crypto orders require specific `time_in_force` values (e.g., 'gtc'). Notional orders have minimums (e.g., $1).
+- **Alpaca Order Parameters:**
+    - Crypto orders require specific `time_in_force` values (e.g., 'gtc').
+    - Notional orders have minimums (e.g., $1).
+    - **BUY orders currently use a fixed $100 notional for testing and check for existing positions.**
+- **Buying Power vs. Available Cash:** The `buying_power` from Alpaca's `getAccount()` might differ from immediately available cash for a specific trade, as seen with the "insufficient balance" error where available was less than total buying power. This needs careful handling in a production system.
