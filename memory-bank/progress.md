@@ -15,9 +15,9 @@
 - **AI Recommendation (Enhanced & More Resilient):**
     - `getTradingRecommendation` function uses an enhanced prompt for Google Gemini, including current price, SMA7, SMA50, and recent OHLC data.
     - Parses the AI response to extract BUY, SELL, or HOLD using `/\b(BUY|SELL|HOLD)\b/i`.
-    - Includes retry logic for Gemini API calls (specifically for 503 errors), defaulting to 'HOLD' if retries fail. **The regex within the retry block is now consistent with the initial attempt's parsing logic.**
-- **Trade Execution (Enhanced):**
-    - `executeTrade` function includes logic to place a market BUY order via Alpaca API using notional value.
+    - Includes retry logic for Gemini API calls (specifically for 503 errors), defaulting to 'HOLD' if retries fail. The regex within the retry block is consistent.
+- **Trade Execution (Enhanced & Corrected):**
+    - `executeTrade` function includes logic to place a market BUY order via Alpaca API using notional value. **Correctly uses `marketIndicators.currentPrice` for price information.**
     - Implemented SELL logic: checks for existing Bitcoin position and closes it if found. Handles 404 errors if no position exists.
 - **Error Handling (Improved):** `try...catch` blocks are implemented for API calls. Retry mechanisms added for `executeTrade` and `getTradingRecommendation` (for 503 errors).
 - **Scheduling:** `node-cron` is configured to run the main trading process every 5 minutes. Immediate run on startup is commented out.
@@ -38,7 +38,7 @@
 
 ## 3. Current Status
 
-- Core functionality significantly enhanced, including improved resilience and parsing for AI API calls.
+- Core functionality significantly enhanced, including improved resilience and parsing for AI API calls, and correction in trade execution logic.
 - Memory Bank updated to reflect these enhancements.
 - Project is ready for user configuration (API keys) and more detailed testing of the trading logic.
 
@@ -48,3 +48,4 @@
 - Risk management is still very basic.
 - Error handling for specific API scenarios can be further improved.
 - The bot currently only trades Bitcoin (BTC/USD).
+- The AI recommendation parsing might still need refinement if Gemini API responses vary significantly.
