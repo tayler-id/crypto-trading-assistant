@@ -10,7 +10,7 @@
     2.  Fetch Market Data (CoinGecko: current price, historical prices, market caps, total volumes, OHLC for Bitcoin)
     3.  Calculate Technical Indicators (SMA7, SMA50 from historical prices)
     4.  Generate AI Prompt (using Account Data, Market Data, and Calculated Indicators)
-    5.  Get AI Recommendation (Gemini: BUY, SELL, HOLD) - includes retry logic for API errors.
+    5.  Get AI Recommendation (Gemini: BUY, SELL, HOLD) - includes retry logic for API errors with consistent parsing.
     6.  Execute Trade (Alpaca: BUY with notional, SELL by closing position) - includes retry logic for API errors.
 - **Scheduling:** Uses `node-cron` for periodic execution (every 5 minutes).
 - **Configuration:** Environment variables loaded via `dotenv` from `config/.env`.
@@ -63,4 +63,7 @@ graph TD
 
 - **API Calls:** Wrapped in `try...catch` blocks. Errors are logged using Winston, including response data and status for HTTP errors.
 - **Trade Execution (`executeTrade`):** Includes a basic retry mechanism (3 attempts with 5-second delay) upon failure. `getPosition` 404 errors are handled gracefully.
-- **AI Recommendation (`getTradingRecommendation`):** Includes retry logic for Gemini API calls (specifically for 503 errors), with a 10-second delay between retries. Defaults to 'HOLD' if retries fail or other errors occur. Basic validation checks if the response starts with 'BUY', 'SELL', or 'HOLD'.
+- **AI Recommendation (`getTradingRecommendation`):**
+    - Includes retry logic for Gemini API calls (specifically for 503 errors), with a 10-second delay between retries.
+    - Defaults to 'HOLD' if retries fail or other errors occur.
+    - Uses `/\b(BUY|SELL|HOLD)\b/i` regex for parsing the recommendation, both in the initial attempt and within the retry logic, ensuring consistency.
