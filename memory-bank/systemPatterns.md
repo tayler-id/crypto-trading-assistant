@@ -18,14 +18,14 @@
 
 ## 2. Key Technical Decisions
 
-- **Brokerage API:** Alpaca (`@alpacahq/alpaca-trade-api`) chosen for its API accessibility for stocks and crypto.
-- **Market Data API:** CoinGecko (via `axios`) chosen for its free tier and comprehensive data endpoints.
+- **Brokerage API:** Alpaca (`@alpacahq/alpaca-trade-api`).
+- **Market Data API:** CoinGecko (via `axios`).
 - **AI Decision Engine:** Google Gemini (`@google/generative-ai`) using `gemini-1.5-flash-latest` model.
 - **Technical Indicators:** Simple Moving Averages (SMA7, SMA50) calculated locally.
 - **Scheduling:** `node-cron`.
-- **Logging:** `winston`.
+- **Logging:** `winston`. Corrected logging for numeric values.
 - **Environment Management:** `dotenv`.
-- **Order Parameters:** Explicitly set `time_in_force: 'gtc'` for crypto orders on Alpaca.
+- **Order Parameters:** Explicitly set `time_in_force: 'gtc'` for crypto orders on Alpaca. Notional amount for BUY orders adjusted to 45% of buying power for testing.
 
 ## 3. Component Relationships
 
@@ -67,7 +67,7 @@ graph TD
     - Uses a `while` loop for retries (max 3 attempts, 5s delay), not recursive.
     - Checks for valid `buyingPower` before BUY.
     - `getPosition` 404 errors handled gracefully for SELL.
-    - Aborts retries for non-transient Alpaca errors (422, 403, 401).
+    - **Corrected retry condition to use `error.response.status` for checking non-retryable Alpaca API errors (403, 422, 401).**
 - **AI Recommendation (`getTradingRecommendation`):**
     - Includes retry logic for Gemini API calls (specifically for 503 errors), with a 10-second delay.
     - Defaults to 'HOLD' and logs if retries fail or other errors occur.
