@@ -176,9 +176,42 @@ Recommendation:`;
         logger.info('Extracted AI Recommendation:', finalRecommendation);
         return finalRecommendation;
     } catch (error) {
-        logger.error('Error getting AI recommendation:', error);
-        // Depending on the error, you might want to implement retry logic here
-        throw error;
+        logger.error('Error getting AI recommendation:', error.message);
+        if (error.status === 503) { // Specific handling for 503 Service Unavailable
+            logger.warn('Gemini API is temporarily unavailable (503). Attempting retries...');
+            const maxRetries = 3;
+            const retryDelayMs = 10000; // 10 seconds for API outages
+
+            for (let i = 0; i < maxRetries; i++) {
+                logger.info(`Retrying AI recommendation (Attempt ${i + 1}/${maxRetries})...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                try {
+                    const result = await model.generateContent(prompt);
+                    const response = await result.response;
+                    let recommendationText = response.text().trim().toUpperCase();
+                    logger.info('Raw AI Recommendation Text (Retry):', recommendationText);
+
+                    let finalRecommendation = 'HOLD';
+                    const match = recommendationText.match(/^(BUY|SELL|HOLD)/);
+                    if (match && match[0]) {
+                        finalRecommendation = match[0];
+                    } else {
+                        logger.warn(`Could not extract a clear BUY/SELL/HOLD from AI response (Retry): "${recommendationText}". Defaulting to HOLD.`);
+                    }
+                    logger.info('AI Recommendation successful on retry:', finalRecommendation);
+                    return finalRecommendation;
+                } catch (retryError) {
+                    logger.error(`Retry attempt ${i + 1} for AI recommendation failed:`, retryError.message);
+                    if (i === maxRetries - 1) {
+                        logger.error('Max retries reached for AI recommendation. Defaulting to HOLD for this cycle.');
+                        return 'HOLD'; // Default to HOLD after max retries for 503
+                    }
+                }
+            }
+        }
+        // For other errors, or if retries for 503 also fail and we didn't return HOLD above.
+        logger.error('Failed to get AI recommendation after all attempts or due to non-retryable error. Defaulting to HOLD.');
+        return 'HOLD'; // Default to HOLD if initial call or retries fail for other reasons
     }
 }
 
