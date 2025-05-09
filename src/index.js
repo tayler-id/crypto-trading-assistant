@@ -226,7 +226,7 @@ async function executeTrade(recommendation, buyingPower, marketIndicators) {
 
         if (recommendation === 'BUY') {
             // Calculate quantity to buy based on buyingPower and current price
-            const bitcoinPrice = marketIndicators.price;
+            const bitcoinPrice = marketIndicators.currentPrice; // Corrected property name
             if (!bitcoinPrice) {
                 logger.error('Cannot execute BUY order: Bitcoin price not available.');
                 return; // Exit if price is not available
