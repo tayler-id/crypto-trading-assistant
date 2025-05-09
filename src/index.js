@@ -246,7 +246,7 @@ async function executeTrade(recommendation, buyingPower, marketIndicators) {
                     logger.error(`Invalid buying power: ${buyingPower}. Cannot execute BUY order.`);
                     return;
                 }
-                const notionalAmount = buyingPower * 0.9; // Use 90% of buying power
+                const notionalAmount = buyingPower * 0.45; // Use 45% of buying power for testing
                 logger.info(`Calculated Notional Amount for BUY: ${notionalAmount}`);
                 if (notionalAmount > 1) { // Alpaca might have minimum notional value (e.g. $1)
                     logger.info(`Attempting to create BUY order with symbol: ${symbol}, notional: ${notionalAmount}`);
@@ -304,8 +304,10 @@ async function executeTrade(recommendation, buyingPower, marketIndicators) {
              // Only retry for specific, potentially transient errors (e.g., 5xx, network issues)
              // A 422 error (Unprocessable Entity) usually means the request itself is flawed (e.g. bad symbol, insufficient funds not caught by pre-check)
              // and retrying the same request won't help.
-            if (error.statusCode && (error.statusCode === 422 || error.statusCode === 403 || error.statusCode === 401)) {
-                logger.error(`Non-retryable Alpaca API error ${error.statusCode}. Aborting retries for this trade.`);
+            // Use error.response.status for HTTP status codes from Axios errors
+            const httpStatusCode = error.response ? error.response.status : null;
+            if (httpStatusCode && (httpStatusCode === 422 || httpStatusCode === 403 || httpStatusCode === 401)) {
+                logger.error(`Non-retryable Alpaca API error ${httpStatusCode}. Aborting retries for this trade.`);
                 return;
             }
         }
